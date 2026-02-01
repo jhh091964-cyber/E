@@ -539,6 +539,7 @@ func (s *Scheduler) stepDeployMailstack(task *Task) *TaskError {
 			ContainerName: fmt.Sprintf("mailserver-%d", task.RowID),
 		}
 		deployResult, err = profile.Deploy(client)
+			DKIMSelector:  s.appConfig.DKIMSelector,
 		if err != nil {
 			return &TaskError{Code: protocol.DeployFailed, Message: fmt.Sprintf("Deployment failed: %v", err)}
 		}
@@ -571,74 +572,133 @@ func (s *Scheduler) stepGenerateDKIM(task *Task) *TaskError {
 	}
 	defer client.Close()
 	
-	// Generate DKIM key
+	var dkimPublicKey string
 	dkimSelector := s.appConfig.DKIMSelector
 	if dkimSelector == "" {
-		dkimSelector = "mail"
-	}
-	dkimKeySize := 2048
-	
-	s.logger.Log(s.runID, task.RowID, protocol.Info, fmt.Sprintf("Generating %d-bit DKIM key for %s...", dkimKeySize, task.Server.Domain))
-	
-	// Install opendkim-tools if needed
-	err = client.InstallPackage("opendkim-tools")
-	if err != nil {
-		s.logger.Log(s.runID, task.RowID, protocol.Warn, fmt.Sprintf("Failed to install opendkim-tools: %v", err))
+		dkimSelector = "s1"  // Default selector
 	}
 	
-	// Create DKIM directory
-	mkdirCmd := fmt.Sprintf("mkdir -p /etc/opendkim/keys/%s", task.Server.Domain)
-	_, err = client.ExecuteCommandWithOutput(mkdirCmd, 30*time.Second)
-	if err != nil {
-		return &TaskError{Code: protocol.DeployFailed, Message: fmt.Sprintf("Failed to create DKIM directory: %v", err)}
+	// Different DKIM generation based on deploy profile
+	if task.Server.DeployProfile == "docker_mailserver" {
+		s.logger.Log(s.runID, task.RowID, protocol.Info, "Using docker-mailserver DKIM generation...")
+		
+		// Use docker-mailserver's profile method
+		profile := &profiles.DockerMailserverProfile{
+			Domain:        task.Server.Domain,
+			Hostname:      task.Server.Host,
+			ContainerName: fmt.Sprintf("mailserver-%d", task.RowID),
+			DKIMSelector:  dkimSelector,
+		}
+		
+		dkimPublicKey, err = profile.GenerateDKIM(client)
+		if err != nil {
+			return &TaskError{Code: protocol.DeployFailed, Message: fmt.Sprintf("Failed to generate DKIM with docker-mailserver: %v", err)}
+		}
+	} else {
+		// Use traditional opendkim-tools method
+		s.logger.Log(s.runID, task.RowID, protocol.Info, fmt.Sprintf("Generating %d-bit DKIM key for %s...", 2048, task.Server.Domain))
+		
+		// Install opendkim-tools if needed
+		err = client.InstallPackage("opendkim-tools")
+		if err != nil {
+			s.logger.Log(s.runID, task.RowID, protocol.Warn, fmt.Sprintf("Failed to install opendkim-tools: %v", err))
+		}
+		
+		// Create DKIM directory
+		mkdirCmd := fmt.Sprintf("mkdir -p /etc/opendkim/keys/%s", task.Server.Domain)
+		_, err = client.ExecuteCommandWithOutput(mkdirCmd, 30*time.Second)
+		if err != nil {
+			return &TaskError{Code: protocol.DeployFailed, Message: fmt.Sprintf("Failed to create DKIM directory: %v", err)}
+		}
+		
+		// Generate DKIM key
+		genKeyCmd := fmt.Sprintf("opendkim-genkey -b 2048 -r -s %s -d %s -D /etc/opendkim/keys/%s", 
+			dkimSelector, task.Server.Domain, task.Server.Domain)
+		output, err := client.ExecuteCommandWithOutput(genKeyCmd, 60*time.Second)
+		if err != nil {
+			return &TaskError{Code: protocol.DeployFailed, Message: fmt.Sprintf("Failed to generate DKIM key: %v, output: %s", err, output)}
+		}
+		
+		// Read DKIM public key
+		dkimKeyPath := fmt.Sprintf("/etc/opendkim/keys/%s/%s.txt", task.Server.Domain, dkimSelector)
+		dkimPublicKey, err = client.ExecuteCommandWithOutput(fmt.Sprintf("cat %s", dkimKeyPath), 30*time.Second)
+		if err != nil {
+			s.logger.Log(s.runID, task.RowID, protocol.Warn, fmt.Sprintf("Failed to read DKIM public key: %v", err))
+			dkimPublicKey = ""
+		}
+		
+		// Normalize DKIM key
+		dkimPublicKey = normalizeDKIMKey(dkimPublicKey)
 	}
 	
-	// Generate DKIM key
-	genKeyCmd := fmt.Sprintf("opendkim-genkey -b %d -r -s %s -d %s -D /etc/opendkim/keys/%s", 
-		dkimKeySize, dkimSelector, task.Server.Domain, task.Server.Domain)
-	output, err := client.ExecuteCommandWithOutput(genKeyCmd, 60*time.Second)
-	if err != nil {
-		return &TaskError{Code: protocol.DeployFailed, Message: fmt.Sprintf("Failed to generate DKIM key: %v, output: %s", err, output)}
+	// Store DKIM public key in task report for DNS step
+	if task.Report != nil && dkimPublicKey != "" {
+		// Store in report's DNS changes temporarily
+		task.Report.DNSChanges = append(task.Report.DNSChanges, DNSChange{
+			Type:    "TXT",
+			Name:    fmt.Sprintf("%s._domainkey", dkimSelector),
+			Content: dkimPublicKey,
+			Action:  "pending",
+		})
 	}
 	
 	s.logger.Log(s.runID, task.RowID, protocol.Info, "DKIM keys generated successfully")
 	return nil
 }
 
+
 // stepDNSApply applies DNS records to Cloudflare
 func (s *Scheduler) stepDNSApply(task *Task) *TaskError {
 	s.logger.Log(s.runID, task.RowID, protocol.Info, "Applying DNS records to Cloudflare...")
 	
-	// Get DKIM public key
-	sshConfig := ssh.Config{
-		Host:     task.Server.ServerIP,
-		Port:     task.Server.ServerPort,
-		User:     task.Server.ServerUser,
-		Password: task.Server.ServerPassword,
-		KeyPath:  task.Server.ServerKeyPath,
-		Timeout:  time.Duration(s.appConfig.SSHTimeoutMs) * time.Millisecond,
-	}
-	
-	client, err := ssh.NewClient(sshConfig)
-	if err != nil {
-		return &TaskError{Code: protocol.SSHConn, Message: fmt.Sprintf("Failed to create SSH client: %v", err)}
-	}
-	defer client.Close()
-	
-	// Read DKIM public key
+	// Get DKIM public key from task report (generated in stepGenerateDKIM)
 	dkimSelector := s.appConfig.DKIMSelector
 	if dkimSelector == "" {
-		dkimSelector = "mail"
-	}
-	dkimKeyPath := fmt.Sprintf("/etc/opendkim/keys/%s/%s.txt", task.Server.Domain, dkimSelector)
-	dkimPublicKey, err := client.ExecuteCommandWithOutput(fmt.Sprintf("cat %s", dkimKeyPath), 30*time.Second)
-	if err != nil {
-		s.logger.Log(s.runID, task.RowID, protocol.Warn, fmt.Sprintf("Failed to read DKIM public key: %v", err))
-		dkimPublicKey = ""
+		dkimSelector = "s1"  // Default selector
 	}
 	
-	// Normalize DKIM key
-	dkimPublicKey = normalizeDKIMKey(dkimPublicKey)
+	// Look for DKIM key in DNS changes from previous step
+	dkimPublicKey := ""
+	if task.Report != nil {
+		for _, change := range task.Report.DNSChanges {
+			if change.Type == "TXT" && change.Name == fmt.Sprintf("%s._domainkey", dkimSelector) {
+				dkimPublicKey = change.Content
+				break
+			}
+		}
+	}
+	
+	// If not found in report, try to read from server (fallback for non-docker-mailserver)
+	if dkimPublicKey == "" {
+		sshConfig := ssh.Config{
+			Host:     task.Server.ServerIP,
+			Port:     task.Server.ServerPort,
+			User:     task.Server.ServerUser,
+			Password: task.Server.ServerPassword,
+			KeyPath:  task.Server.ServerKeyPath,
+			Timeout:  time.Duration(s.appConfig.SSHTimeoutMs) * time.Millisecond,
+		}
+		
+		client, err := ssh.NewClient(sshConfig)
+		if err == nil {
+			defer client.Close()
+			
+			var dkimKeyPath string
+			if task.Server.DeployProfile == "docker_mailserver" {
+				dkimKeyPath = fmt.Sprintf("/opt/mailserver/config/opendkim/%s.txt", dkimSelector)
+			} else {
+				dkimKeyPath = fmt.Sprintf("/etc/opendkim/keys/%s/%s.txt", task.Server.Domain, dkimSelector)
+			}
+			
+			dkimPublicKey, err = client.ExecuteCommandWithOutput(fmt.Sprintf("cat %s", dkimKeyPath), 30*time.Second)
+			if err != nil {
+				s.logger.Log(s.runID, task.RowID, protocol.Warn, fmt.Sprintf("Failed to read DKIM public key: %v", err))
+				dkimPublicKey = ""
+			} else {
+				dkimPublicKey = normalizeDKIMKey(dkimPublicKey)
+			}
+		}
+	}
 	
 	// Create DNS provider
 	dnsProvider := cloudflare.NewProvider(task.Server.CFAPIToken, s.dnsDryRun)
@@ -673,7 +733,7 @@ func (s *Scheduler) stepDNSApply(task *Task) *TaskError {
 	} else {
 		// Create A record (upsert)
 		s.logger.Log(s.runID, task.RowID, protocol.Info, "Creating/updating A record...")
-		err = dnsProvider.UpsertRecord("A", task.Server.Host, task.Server.ServerIP, nil)
+		err := dnsProvider.UpsertRecord("A", task.Server.Host, task.Server.ServerIP, nil)
 		if err != nil {
 			return &TaskError{Code: protocol.DNSAuthFailed, Message: fmt.Sprintf("Failed to create A record: %v", err)}
 		}
@@ -744,6 +804,7 @@ func (s *Scheduler) stepDNSApply(task *Task) *TaskError {
 	s.logger.Log(s.runID, task.RowID, protocol.Info, "DNS records applied successfully")
 	return nil
 }
+
 
 // stepHealthcheck performs health checks on the deployed mail server
 func (s *Scheduler) stepHealthcheck(task *Task) *TaskError {
