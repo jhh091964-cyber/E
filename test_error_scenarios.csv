@@ -1,0 +1,4 @@
+row_id,cf_api_token,cf_zone,server_ip,server_port,server_user,server_password,server_key_path,host,domain,deploy_profile,email_use,solution
+1,invalid_token,marris-h.com,8.209.248.225,22,root,NerssBiU56,,mail,mail.marris-h.com,postfix_dovecot,test,错误测试-无效API_Token
+2,k_X-eQbibZWXrODy3ctlfnt1And1WZHaX_rapWYJ,marris-h.com,192.168.999.999,22,root,NerssBiU56,,mail,mail2.marris-h.com,postfix_dovecot,test,错误测试-无效IP
+3,k_X-eQbibZWXrODy3ctlfnt1And1WZHaX_rapWYJ,marris-h.com,8.209.248.225,22,wrong_user,wrong_pass,,mail,mail3.marris-h.com,postfix_dovecot,test,错误测试-SSH认证失败

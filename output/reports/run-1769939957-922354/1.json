@@ -1,0 +1,89 @@
+{
+  "row_id": 1,
+  "domain": "mail.marris-h.com",
+  "server_ip": "8.209.248.225",
+  "server_port": 22,
+  "deploy_profile": "postfix_dovecot",
+  "status": "FAILED",
+  "start_time": "2026-02-01T09:59:17Z",
+  "end_time": "2026-02-01T10:02:06Z",
+  "duration_ms": 48678,
+  "steps": [
+    {
+      "step": "validate_input",
+      "success": true,
+      "duration_ms": 0,
+      "message": "Step validate_input completed"
+    },
+    {
+      "step": "ssh_connect_test",
+      "success": true,
+      "duration_ms": 1940,
+      "message": "Step ssh_connect_test completed"
+    },
+    {
+      "step": "server_prepare",
+      "success": true,
+      "duration_ms": 19199,
+      "message": "Step server_prepare completed"
+    },
+    {
+      "step": "deploy_mailstack",
+      "success": false,
+      "duration_ms": 49774,
+      "message": "Step deploy_mailstack failed: Deployment failed: failed to configure OpenDKIM: command failed (exit code 1): Job for opendkim.service failed because the control process exited with error code.\nSee \"systemctl status opendkim.service\" and \"journalctl -xeu opendkim.service\" for details.\n"
+    },
+    {
+      "step": "validate_input",
+      "success": true,
+      "duration_ms": 0,
+      "message": "Step validate_input completed"
+    },
+    {
+      "step": "ssh_connect_test",
+      "success": true,
+      "duration_ms": 1880,
+      "message": "Step ssh_connect_test completed"
+    },
+    {
+      "step": "server_prepare",
+      "success": true,
+      "duration_ms": 19247,
+      "message": "Step server_prepare completed"
+    },
+    {
+      "step": "deploy_mailstack",
+      "success": false,
+      "duration_ms": 27331,
+      "message": "Step deploy_mailstack failed: Deployment failed: failed to configure OpenDKIM: command failed (exit code 1): Job for opendkim.service failed because the control process exited with error code.\nSee \"systemctl status opendkim.service\" and \"journalctl -xeu opendkim.service\" for details.\n"
+    },
+    {
+      "step": "validate_input",
+      "success": true,
+      "duration_ms": 0,
+      "message": "Step validate_input completed"
+    },
+    {
+      "step": "ssh_connect_test",
+      "success": true,
+      "duration_ms": 1938,
+      "message": "Step ssh_connect_test completed"
+    },
+    {
+      "step": "server_prepare",
+      "success": true,
+      "duration_ms": 19241,
+      "message": "Step server_prepare completed"
+    },
+    {
+      "step": "deploy_mailstack",
+      "success": false,
+      "duration_ms": 27497,
+      "message": "Step deploy_mailstack failed: Deployment failed: failed to configure OpenDKIM: command failed (exit code 1): Job for opendkim.service failed because the control process exited with error code.\nSee \"systemctl status opendkim.service\" and \"journalctl -xeu opendkim.service\" for details.\n"
+    }
+  ],
+  "health_check": {
+    "ports": {},
+    "services": {}
+  }
+}

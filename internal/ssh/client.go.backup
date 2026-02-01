@@ -1,0 +1,275 @@
+package ssh
+
+import (
+	"errors"
+	"bytes"
+	"fmt"
+	"os"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+)
+
+// Client represents an SSH client
+type Client struct {
+	host     string
+	port     int
+	user     string
+	password string
+	keyPath  string
+	timeout  time.Duration
+	client   *ssh.Client
+}
+
+// CommandResult represents the result of a command execution
+type CommandResult struct {
+	ExitCode int
+	Stdout   string
+	Stderr   string
+	Duration time.Duration
+}
+
+// Config represents SSH client configuration
+type Config struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	KeyPath  string
+	Timeout  time.Duration
+}
+
+// NewClient creates a new SSH client
+func NewClient(config Config) (*Client, error) {
+	client := &Client{
+		host:     config.Host,
+		port:     config.Port,
+		user:     config.User,
+		password: config.Password,
+		keyPath:  config.KeyPath,
+		timeout:  config.Timeout,
+	}
+	
+	if err := client.connect(); err != nil {
+		return nil, err
+	}
+	
+	return client, nil
+}
+
+// connect establishes SSH connection
+func (c *Client) connect() error {
+	// Build SSH client config
+	sshConfig := &ssh.ClientConfig{
+		User:            c.user,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Use proper host key verification
+		Timeout:         c.timeout,
+	}
+	
+	// Configure authentication method
+	if c.keyPath != "" {
+		// Use key-based authentication
+		key, err := ssh.ParsePrivateKey([]byte(c.keyPath))
+		if err != nil {
+			// Try to read from file
+			keyBytes, err := os.ReadFile(c.keyPath)
+			if err != nil {
+				return fmt.Errorf("failed to read SSH key: %w", err)
+			}
+			key, err = ssh.ParsePrivateKey(keyBytes)
+			if err != nil {
+				return fmt.Errorf("failed to parse SSH key: %w", err)
+			}
+		}
+		sshConfig.Auth = []ssh.AuthMethod{ssh.PublicKeys(key)}
+	} else if c.password != "" {
+		// Use password authentication
+		sshConfig.Auth = []ssh.AuthMethod{ssh.Password(c.password)}
+	} else {
+		return fmt.Errorf("no authentication method provided")
+	}
+	
+	// Connect to SSH server
+	address := fmt.Sprintf("%s:%d", c.host, c.port)
+	client, err := ssh.Dial("tcp", address, sshConfig)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	
+	c.client = client
+	return nil
+}
+
+// ExecuteCommand executes a command on the remote server
+func (c *Client) ExecuteCommand(cmd string, timeout time.Duration) (*CommandResult, error) {
+	if c.client == nil {
+		return nil, fmt.Errorf("not connected")
+	}
+	
+	startTime := time.Now()
+	
+	// Create session
+	session, err := c.client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Close()
+	
+	// Set timeout
+	if timeout > 0 {
+		done := make(chan error, 1)
+		go func() {
+			done <- session.Run(cmd)
+		}()
+		
+		select {
+		case <-time.After(timeout):
+			return nil, fmt.Errorf("command timeout after %v", timeout)
+		case err := <-done:
+			if err != nil {
+				var exitErr *ssh.ExitError
+		if ok := errors.As(err, &exitErr); ok {
+			}
+				}
+				return &CommandResult{
+					ExitCode: exitErr.ExitStatus(),
+					Stdout:   "",
+					Stderr:   err.Error(),
+					Duration: time.Since(startTime),
+				}, nil
+			}
+		}
+	} else {
+		// No timeout
+		var stdoutBuf, stderrBuf bytes.Buffer
+		session.Stdout = &stdoutBuf
+		session.Stderr = &stderrBuf
+		
+		err := session.Run(cmd)
+		
+		exitCode := 0
+		if err != nil {
+			if exitErr, ok := err.(*ssh.ExitError); ok {
+				exitCode = exitErr.ExitStatus()
+			}
+		}
+		
+		return &CommandResult{
+			ExitCode: exitCode,
+			Stdout:   stdoutBuf.String(),
+			Stderr:   stderrBuf.String(),
+			Duration: time.Since(startTime),
+		}, err
+	}
+	
+	return &CommandResult{
+		ExitCode: 0,
+		Stdout:   "",
+		Stderr:   "",
+		Duration: time.Since(startTime),
+	}, nil
+}
+
+// ExecuteCommandWithOutput executes a command and returns combined output
+func (c *Client) ExecuteCommandWithOutput(cmd string, timeout time.Duration) (string, error) {
+	result, err := c.ExecuteCommand(cmd, timeout)
+	if err != nil && result.ExitCode != 0 {
+		return result.Stdout, fmt.Errorf("command failed (exit code %d): %s", result.ExitCode, result.Stderr)
+	}
+	
+	return result.Stdout, nil
+}
+
+// Close closes the SSH connection
+func (c *Client) Close() error {
+	if c.client != nil {
+		return c.client.Close()
+	}
+	return nil
+}
+
+// TestConnection tests the SSH connection
+func (c *Client) TestConnection() error {
+	// Execute a simple command to test connection
+	_, err := c.ExecuteCommandWithOutput("echo 'connection test'", 5*time.Second)
+	return err
+}
+
+// GetHostname returns the remote hostname
+func (c *Client) GetHostname() (string, error) {
+	return c.ExecuteCommandWithOutput("hostname", 5*time.Second)
+}
+
+// GetOSInfo returns OS information
+func (c *Client) GetOSInfo() (string, error) {
+	return c.ExecuteCommandWithOutput("cat /etc/os-release | head -1", 5*time.Second)
+}
+
+// CheckPort checks if a port is listening
+func (c *Client) CheckPort(port int) (bool, error) {
+	output, err := c.ExecuteCommandWithOutput(
+		fmt.Sprintf("netstat -tln | grep ':%d ' || ss -tln | grep ':%d '", port, port),
+		5*time.Second,
+	)
+	if err != nil {
+		return false, nil
+	}
+	return output != "", nil
+}
+
+// InstallPackage installs a package using apt/yum
+func (c *Client) InstallPackage(packageName string) error {
+	// Detect package manager
+	output, err := c.ExecuteCommandWithOutput("command -v apt-get || command -v yum", 5*time.Second)
+	if err != nil {
+		return fmt.Errorf("no package manager found")
+	}
+	
+	var cmd string
+	if bytes.Contains([]byte(output), []byte("apt-get")) {
+		cmd = fmt.Sprintf("apt-get update && apt-get install -y %s", packageName)
+	} else {
+		cmd = fmt.Sprintf("yum install -y %s", packageName)
+	}
+	
+	result, err := c.ExecuteCommand(cmd, 10*time.Minute)
+	if err != nil || result.ExitCode != 0 {
+		return fmt.Errorf("failed to install package %s: %s", packageName, result.Stderr)
+	}
+	
+	return nil
+}
+
+// UploadFile uploads a file to the remote server
+func (c *Client) UploadFile(localPath, remotePath string) error {
+	if c.client == nil {
+		return fmt.Errorf("not connected")
+	}
+	
+	session, err := c.client.NewSession()
+	if err != nil {
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Close()
+	
+	// Use scp to upload file
+	// This is a simplified version - production code should use sftp
+	content, err := os.ReadFile(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to read local file: %w", err)
+	}
+	
+	// Write file using cat
+	go func() {
+		w, _ := session.StdinPipe()
+		defer w.Close()
+		fmt.Fprintln(w, string(content))
+	}()
+	
+	cmd := fmt.Sprintf("cat > %s", remotePath)
+	if err := session.Run(cmd); err != nil {
+		return fmt.Errorf("failed to upload file: %w", err)
+	}
+	
+	return nil
+}

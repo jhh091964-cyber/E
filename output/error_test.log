@@ -1,0 +1,8 @@
+{"level":"INFO","message":"[:0] MailOps CLI started in event stream mode","timestamp":"2026-02-01T06:24:45Z"}
+{"level":"INFO","message":"[512189:0] Starting run: 512189","timestamp":"2026-02-01T06:24:45Z"}
+{"level":"INFO","message":"[512189:0] Loaded 3 server configurations","timestamp":"2026-02-01T06:24:45Z"}
+{"run_id":"512189","total_tasks":3,"concurrency":3,"dry_run":false}
+{"run_id":"512189","completed":0,"total":3,"success":0,"failed":0,"cancelled":0,"running":0,"pending":3}
+{"row_id":1,"step":"validate_input","phase":"START","message":"Starting validate_input","success":false}
+{"row_id":2,"step":"validate_input","phase":"START","message":"Starting validate_input","success":false}
+{"row_id":2,"step":"validate_input","phase":"START","message":"Starting validate_input","success":false}

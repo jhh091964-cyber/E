@@ -1,0 +1,6 @@
+row_id,cf_api_token,cf_zone,server_ip,server_port,server_user,server_password,server_key_path,host,domain,deploy_profile,email_use,solution
+1,abc123def456ghi789jkl012mno345pq,example.com,192.168.1.100,22,root,MyPassword123,,mail,mail1.example.com,postfix_dovecot,transactional,方案A-成功案例
+2,xyz789abc456def123ghi456jkl789mno,testdomain.com,192.168.1.101,22,root,SecurePass456,,mail,mail2.testdomain.com,postfix_dovecot,internal,方案A-成功案例
+3,pqr456mno789abc123def456ghi789jkl,demo.org,192.168.1.102,22,ubuntu,UbuntuPass789,,mailserver,demo.org,docker_mailserver,test,方案B-成功案例
+4,invalid_token_12345,bad-domain.com,192.168.1.103,22,root,WrongPass999,,smtp,bad-domain.com,postfix_dovecot,test,失败案例-API错误
+5,mno345pqr678stu901vwx234yz567abc890,not-in-cloudflare.com,192.168.1.104,22,root,CannotConnect123,,mail,not-in-cloudflare.com,docker_mailserver,transactional,失败案例-DNS配置

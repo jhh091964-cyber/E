@@ -1,0 +1,66 @@
+{"level":"INFO","message":"[:0] MailOps CLI started in event stream mode","timestamp":"2026-02-01T06:23:52Z"}
+{"level":"INFO","message":"[697539:0] Starting run: 697539","timestamp":"2026-02-01T06:23:52Z"}
+{"level":"INFO","message":"[697539:0] Loaded 3 server configurations","timestamp":"2026-02-01T06:23:52Z"}
+{"run_id":"697539","total_tasks":3,"concurrency":3,"dry_run":true}
+{"run_id":"697539","completed":0,"total":3,"success":0,"failed":0,"cancelled":0,"running":0,"pending":3}
+{"row_id":1,"step":"validate_input","phase":"START","message":"Starting validate_input","success":false}
+{"row_id":2,"step":"validate_input","phase":"START","message":"Starting validate_input","success":false}
+{"row_id":3,"step":"validate_input","phase":"START","message":"Starting validate_input","success":false}
+{"row_id":1,"step":"validate_input","phase":"END","message":"Completed validate_input","success":true}
+{"row_id":1,"step":"ssh_connect_test","phase":"START","message":"Starting ssh_connect_test","success":false}
+{"row_id":3,"step":"validate_input","phase":"END","message":"Completed validate_input","success":true}
+{"row_id":3,"step":"ssh_connect_test","phase":"START","message":"Starting ssh_connect_test","success":false}
+{"row_id":2,"step":"validate_input","phase":"END","message":"Completed validate_input","success":true}
+{"row_id":2,"step":"ssh_connect_test","phase":"START","message":"Starting ssh_connect_test","success":false}
+{"row_id":1,"step":"ssh_connect_test","phase":"END","message":"Completed ssh_connect_test","success":true}
+{"row_id":1,"step":"server_prepare","phase":"START","message":"Starting server_prepare","success":false}
+{"row_id":2,"step":"ssh_connect_test","phase":"END","message":"Completed ssh_connect_test","success":true}
+{"row_id":2,"step":"server_prepare","phase":"START","message":"Starting server_prepare","success":false}
+{"row_id":1,"step":"server_prepare","phase":"END","message":"Completed server_prepare","success":true}
+{"row_id":1,"step":"deploy_mailstack","phase":"START","message":"Starting deploy_mailstack","success":false}
+{"run_id":"697539","completed":0,"total":3,"success":0,"failed":0,"cancelled":0,"running":0,"pending":3}
+{"row_id":2,"step":"server_prepare","phase":"END","message":"Completed server_prepare","success":true}
+{"row_id":2,"step":"deploy_mailstack","phase":"START","message":"Starting deploy_mailstack","success":false}
+{"row_id":3,"step":"ssh_connect_test","phase":"END","message":"Completed ssh_connect_test","success":true}
+{"row_id":3,"step":"server_prepare","phase":"START","message":"Starting server_prepare","success":false}
+{"run_id":"697539","completed":0,"total":3,"success":0,"failed":0,"cancelled":0,"running":0,"pending":3}
+{"row_id":1,"step":"deploy_mailstack","phase":"END","message":"Completed deploy_mailstack","success":true}
+{"row_id":1,"step":"generate_dkim","phase":"START","message":"Starting generate_dkim","success":false}
+{"row_id":2,"step":"deploy_mailstack","phase":"END","message":"Completed deploy_mailstack","success":true}
+{"row_id":2,"step":"generate_dkim","phase":"START","message":"Starting generate_dkim","success":false}
+{"row_id":3,"step":"server_prepare","phase":"END","message":"Completed server_prepare","success":true}
+{"row_id":3,"step":"deploy_mailstack","phase":"START","message":"Starting deploy_mailstack","success":false}
+{"row_id":1,"step":"generate_dkim","phase":"END","message":"Completed generate_dkim","success":true}
+{"row_id":1,"step":"dns_apply","phase":"START","message":"Starting dns_apply","success":false}
+{"row_id":2,"step":"generate_dkim","phase":"END","message":"Completed generate_dkim","success":true}
+{"row_id":2,"step":"dns_apply","phase":"START","message":"Starting dns_apply","success":false}
+{"run_id":"697539","completed":0,"total":3,"success":0,"failed":0,"cancelled":0,"running":0,"pending":3}
+{"row_id":1,"step":"dns_apply","phase":"END","message":"Completed dns_apply","success":true}
+{"row_id":1,"step":"healthcheck","phase":"START","message":"Starting healthcheck","success":false}
+{"row_id":3,"step":"deploy_mailstack","phase":"END","message":"Completed deploy_mailstack","success":true}
+{"row_id":3,"step":"generate_dkim","phase":"START","message":"Starting generate_dkim","success":false}
+{"row_id":2,"step":"dns_apply","phase":"END","message":"Completed dns_apply","success":true}
+{"row_id":2,"step":"healthcheck","phase":"START","message":"Starting healthcheck","success":false}
+{"row_id":1,"step":"healthcheck","phase":"END","message":"Completed healthcheck","success":true}
+{"row_id":1,"step":"finalize_report","phase":"START","message":"Starting finalize_report","success":false}
+{"row_id":3,"step":"generate_dkim","phase":"END","message":"Completed generate_dkim","success":true}
+{"row_id":3,"step":"dns_apply","phase":"START","message":"Starting dns_apply","success":false}
+{"run_id":"697539","completed":0,"total":3,"success":0,"failed":0,"cancelled":0,"running":0,"pending":3}
+{"row_id":2,"step":"healthcheck","phase":"END","message":"Completed healthcheck","success":true}
+{"row_id":2,"step":"finalize_report","phase":"START","message":"Starting finalize_report","success":false}
+{"row_id":1,"step":"finalize_report","phase":"END","message":"Completed finalize_report","success":true}
+{"row_id":1,"state":"SUCCESS","message":"SUCCESS"}
+{"row_id":2,"step":"finalize_report","phase":"END","message":"Completed finalize_report","success":true}
+{"row_id":2,"state":"SUCCESS","message":"SUCCESS"}
+{"row_id":3,"step":"dns_apply","phase":"END","message":"Completed dns_apply","success":true}
+{"row_id":3,"step":"healthcheck","phase":"START","message":"Starting healthcheck","success":false}
+{"run_id":"697539","completed":2,"total":3,"success":2,"failed":0,"cancelled":0,"running":0,"pending":1}
+{"row_id":3,"step":"healthcheck","phase":"END","message":"Completed healthcheck","success":true}
+{"row_id":3,"step":"finalize_report","phase":"START","message":"Starting finalize_report","success":false}
+{"run_id":"697539","completed":2,"total":3,"success":2,"failed":0,"cancelled":0,"running":0,"pending":1}
+{"row_id":3,"step":"finalize_report","phase":"END","message":"Completed finalize_report","success":true}
+{"row_id":3,"state":"SUCCESS","message":"SUCCESS"}
+{"run_id":"697539","completed":3,"total":3,"success":3,"failed":0,"cancelled":0,"running":0,"pending":0}
+{"run_id":"697539","status":"COMPLETED","total_tasks":3,"success":3,"failed":0,"cancelled":0,"results_file":"output/results/success.txt","report_file":"output/reports/697539"}
+{"level":"INFO","message":"[697539:0] Run completed: 3 success, 0 failed, 0 cancelled","timestamp":"2026-02-01T06:23:55Z"}
+{"level":"INFO","message":"[:0] Received EOF, shutting down","timestamp":"2026-02-01T06:23:55Z"}

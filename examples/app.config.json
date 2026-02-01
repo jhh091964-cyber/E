@@ -1,0 +1,24 @@
+{
+  "concurrency_default": 10,
+  "retry_max": 2,
+  "retry_backoff_ms": 500,
+  "ssh_timeout_ms": 10000,
+  "cmd_timeout_ms": 600000,
+  "dns_dry_run_default": false,
+  "log_masking": true,
+  "dkim_selector": "s1",
+  "spf_template": "v=spf1 a mx ip4:{server_ip} -all",
+  "dmarc_template": "v=DMARC1; p=none; rua=mailto:dmarc@{domain}",
+  "healthcheck": {
+    "ports": [25, 587, 465, 143, 993],
+    "services": {
+      "postfix_dovecot": ["postfix", "dovecot"],
+      "docker_mailserver": ["docker"]
+    },
+    "timeout_ms": 5000
+  },
+  "cloudflare": {
+    "api_timeout_ms": 10000,
+    "rate_limit_rps": 20
+  }
+}
