@@ -3,7 +3,6 @@ name: Build Windows EXE
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build:
@@ -18,16 +17,22 @@ jobs:
         with:
           dotnet-version: '6.0.x'
 
-      - name: Build Desktop EXE
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build Single EXE
         run: |
-          dotnet restore
-          dotnet publish -c Release -r win-x64 ^
-            /p:PublishSingleFile=true ^
-            /p:SelfContained=true ^
-            -o dist
+          dotnet publish MailOpsDesktop.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            /p:PublishSingleFile=true `
+            /p:IncludeNativeLibrariesForSelfExtract=true `
+            /p:EnableCompressionInSingleFile=true `
+            -o publish
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
           name: MailOpsDesktop-win-x64
-          path: dist
+          path: publish/*.exe
