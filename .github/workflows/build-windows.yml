@@ -1,0 +1,58 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "6.0.x"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21.x"
+
+      # 如果你專案根目錄就是 MailOps-Desktop，這段不用改
+      # 如果 zip 解出來多一層資料夾，請在這裡調整 working-directory
+      - name: Restore & Build Desktop (Release)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          ls
+          # 依你的 repo 結構，挑一個存在的路徑
+          if (Test-Path "src/MailOpsDesktop/MailOpsDesktop.csproj") {
+            dotnet restore "src/MailOpsDesktop/MailOpsDesktop.csproj"
+            dotnet publish "src/MailOpsDesktop/MailOpsDesktop.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -p:PublishTrimmed=false -o "dist/desktop"
+          } elseif (Test-Path "MailOps-Desktop/src/MailOpsDesktop/MailOpsDesktop.csproj") {
+            dotnet restore "MailOps-Desktop/src/MailOpsDesktop/MailOpsDesktop.csproj"
+            dotnet publish "MailOps-Desktop/src/MailOpsDesktop/MailOpsDesktop.csproj" -c Release -r win-x64 -p:PublishSingleFile=false -p:PublishTrimmed=false -o "dist/desktop"
+          } else {
+            throw "找不到 csproj，請確認 repo 結構路徑。"
+          }
+
+      # 產出 portable 套件（資料夾版：最穩）
+      - name: Package Portable Folder
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path "dist/package" | Out-Null
+          Copy-Item -Recurse -Force "dist/desktop/*" "dist/package/"
+          Compress-Archive -Path "dist/package/*" -DestinationPath "MailOpsDesktop_portable_win-x64.zip" -Force
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MailOpsDesktop_portable_win-x64
+          path: MailOpsDesktop_portable_win-x64.zip
