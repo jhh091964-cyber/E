@@ -1,0 +1,63 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: ./src/MailOpsDesktop
+      
+    - name: Build project
+      run: dotnet build --configuration Release --no-restore
+      working-directory: ./src/MailOpsDesktop
+      
+    - name: Publish Windows EXE
+      run: |
+        dotnet publish `
+          --configuration Release `
+          --runtime win-x64 `
+          --self-contained true `
+          --output ../../dist `
+          -p:PublishSingleFile=true `
+          -p:IncludeNativeLibrariesForSelfExtract=true `
+          -p:EnableCompressionInSingleFile=true
+      working-directory: ./src/MailOpsDesktop
+      shell: pwsh
+      
+    - name: Verify output
+      run: |
+        Write-Host "=== Build Output ==="
+        Get-ChildItem -Path dist/ -File
+        if (Test-Path "dist/MailOpsDesktop.exe") {
+            Write-Host "✓ MailOpsDesktop.exe found"
+            $size = (Get-Item "dist/MailOpsDesktop.exe").Length
+            Write-Host "  Size: $size bytes"
+        } else {
+            Write-Host "✗ MailOpsDesktop.exe NOT found"
+            exit 1
+        }
+      shell: pwsh
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MailOpsDesktop-Windows
+        path: dist/MailOpsDesktop.exe
+        retention-days: 30
