@@ -21,8 +21,15 @@ jobs:
         dotnet-version: '6.0.x'
         
     - name: Restore dependencies
-      run: dotnet restore
+      run: |
+        Write-Host "Current directory:"
+        Get-Location
+        Write-Host "Directory contents:"
+        Get-ChildItem
+        Write-Host "Attempting to restore dependencies..."
+        dotnet restore --verbosity detailed
       working-directory: src/MailOpsDesktop
+      shell: pwsh
       
     - name: Build project
       run: dotnet build --configuration Release --no-restore
