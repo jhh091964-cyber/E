@@ -1,11 +1,16 @@
 name: Build Windows EXE
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '**.py'
+      - '**.spec'
+      - '**.bat'
+      - 'requirements.txt'
 
 jobs:
   build:
@@ -15,49 +20,89 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        dotnet-version: '6.0.x'
+        python-version: '3.11'
         
-    - name: Restore dependencies
-      run: dotnet restore
-      working-directory: src/MailOpsDesktop
-      
-    - name: Build project
-      run: dotnet build --configuration Release --no-restore
-      working-directory: src/MailOpsDesktop
-      
-    - name: Publish Windows EXE
+    - name: Install dependencies
       run: |
-        dotnet publish `
-          --configuration Release `
-          --runtime win-x64 `
-          --self-contained true `
-          --output ../../dist `
-          -p:PublishSingleFile=true `
-          -p:IncludeNativeLibrariesForSelfExtract=true `
-          -p:EnableCompressionInSingleFile=true
-      working-directory: src/MailOpsDesktop
-      shell: pwsh
-      
-    - name: Verify output
+        python -m pip install --upgrade pip
+        pip install PySide6==6.6.0
+        pip install requests==2.31.0
+        pip install paramiko==3.4.0
+        pip install PySocks>=1.7.1
+        pip install pyinstaller
+        pip install certifi
+        
+    - name: Verify imports
       run: |
-        Write-Host "=== Build Output ==="
-        Get-ChildItem -Path dist/ -File
-        if (Test-Path "dist/MailOpsDesktop.exe") {
-            Write-Host "✓ MailOpsDesktop.exe found"
-            $size = (Get-Item "dist/MailOpsDesktop.exe").Length
-            Write-Host "  Size: $size bytes"
-        } else {
-            Write-Host "✗ MailOpsDesktop.exe NOT found"
+        python -c "import account_store; print('✓ account_store ok')"
+        python -c "import account_card; print('✓ account_card ok')"
+        python -c "import sender_manager; print('✓ sender_manager ok')"
+        python -c "import template_manager; print('✓ template_manager ok')"
+        python -c "import variable_parser; print('✓ variable_parser ok')"
+        
+    - name: Create necessary directories
+      run: |
+        if not exist "config" mkdir config
+        if not exist "data" mkdir data
+        if not exist "logs" mkdir logs
+        if not exist "templates" mkdir templates
+        echo {} > config\accounts.json
+        echo {} > data\apis.json
+        
+    - name: Build EXE with PyInstaller
+      run: |
+        pyinstaller --clean --noconfirm main_windows.spec
+        
+    - name: Verify build
+      run: |
+        echo "=== dist directory structure ==="
+        dir dist\main
+        echo ""
+        echo "=== Checking main.exe ==="
+        if exist "dist\main\main.exe" (
+            echo "✓ main.exe found"
+            dir dist\main\main.exe
+        ) else (
+            echo "✗ main.exe NOT found"
             exit 1
-        }
-      shell: pwsh
-      
+        )
+        
+    - name: Create distribution ZIP
+      run: |
+        cd dist
+        powershell -Command "Compress-Archive -Path main\* -DestinationPath mail_sender_windows.zip -Force"
+        cd ..
+        echo "=== ZIP file info ==="
+        dir dist\mail_sender_windows.zip
+        
+    - name: Calculate SHA256
+      run: |
+        certutil -hashfile dist\mail_sender_windows.zip SHA256
+        
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: MailOpsDesktop-Windows
-        path: dist/MailOpsDesktop.exe
+        name: mail-sender-windows-zip
+        path: dist/mail_sender_windows.zip
         retention-days: 30
+        
+    - name: Upload EXE artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mail-sender-exe
+        path: dist/main/main.exe
+        retention-days: 30
+        
+    - name: Create Release Summary
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 Output: \`dist/mail_sender_windows.zip\`" >> $GITHUB_STEP_SUMMARY
+        echo "- 📁 Unzip and run \`main/main.exe\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Download Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "Artifacts are available in the Actions tab for 30 days." >> $GITHUB_STEP_SUMMARY
