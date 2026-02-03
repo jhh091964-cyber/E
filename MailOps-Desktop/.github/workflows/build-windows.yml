@@ -22,39 +22,52 @@ jobs:
         
     - name: Restore dependencies
       run: |
+        Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
         Write-Host "Current directory:"
         Get-Location
-        Write-Host "Directory contents:"
-        Get-ChildItem
         Write-Host "Attempting to restore dependencies..."
-        dotnet restore --verbosity detailed
-      working-directory: src/MailOpsDesktop
+        $projPath = Join-Path $env:GITHUB_WORKSPACE "src/MailOpsDesktop/MailOpsDesktop.csproj"
+        Write-Host "Project path: $projPath"
+        if (Test-Path $projPath) {
+            Write-Host "Project file found!"
+            dotnet restore "$projPath" --verbosity detailed
+        } else {
+            Write-Host "Project file NOT found!"
+            Write-Host "Listing directory contents:"
+            Get-ChildItem -Path $env:GITHUB_WORKSPACE -Recurse -Depth 2
+            exit 1
+        }
       shell: pwsh
       
     - name: Build project
-      run: dotnet build --configuration Release --no-restore
-      working-directory: src/MailOpsDesktop
+      run: |
+        $projPath = Join-Path $env:GITHUB_WORKSPACE "src/MailOpsDesktop/MailOpsDesktop.csproj"
+        dotnet build "$projPath" --configuration Release --no-restore
+      shell: pwsh
       
     - name: Publish Windows EXE
       run: |
-        dotnet publish `
+        $projPath = Join-Path $env:GITHUB_WORKSPACE "src/MailOpsDesktop/MailOpsDesktop.csproj"
+        $outputPath = Join-Path $env:GITHUB_WORKSPACE "dist"
+        dotnet publish "$projPath" `
           --configuration Release `
           --runtime win-x64 `
           --self-contained true `
-          --output ../../dist `
+          --output "$outputPath" `
           -p:PublishSingleFile=true `
           -p:IncludeNativeLibrariesForSelfExtract=true `
           -p:EnableCompressionInSingleFile=true
-      working-directory: src/MailOpsDesktop
       shell: pwsh
       
     - name: Verify output
       run: |
         Write-Host "=== Build Output ==="
-        Get-ChildItem -Path dist/ -File
-        if (Test-Path "dist/MailOpsDesktop.exe") {
+        $outputPath = Join-Path $env:GITHUB_WORKSPACE "dist"
+        Get-ChildItem -Path $outputPath -File
+        $exePath = Join-Path $outputPath "MailOpsDesktop.exe"
+        if (Test-Path $exePath) {
             Write-Host "✓ MailOpsDesktop.exe found"
-            $size = (Get-Item "dist/MailOpsDesktop.exe").Length
+            $size = (Get-Item $exePath).Length
             Write-Host "  Size: $size bytes"
         } else {
             Write-Host "✗ MailOpsDesktop.exe NOT found"
